@@ -15,7 +15,7 @@ helm-ingress-nginx (NGINX Ingress Helm values, pinned v4.10.0)
     └── policies/             ← OPA constraint templates + constraints
              │
              ▼
-    terraform-azure-aks-deployment
+    azure-challenges/challenge-2
     (calls bootstrap.sh after terraform apply)
 ```
 
@@ -75,5 +75,5 @@ The bootstrap script:
 
 - [helm-gatekeeper](https://github.com/KT-MakeDevOpsEasy/helm-gatekeeper) — Gatekeeper Helm configuration
 - [helm-ingress-nginx](https://github.com/KT-MakeDevOpsEasy/helm-ingress-nginx) — NGINX Ingress Helm configuration
-- [terraform-aks-deployment](https://github.com/KT-MakeDevOpsEasy/terraform-azure-aks-deployment) — AKS infrastructure
+- [azure-challenges](https://github.com/KT-MakeDevOpsEasy/azure-challenges) — Challenge deployments (VNET + AKS)
 - [aks-app-deployment](https://github.com/KT-MakeDevOpsEasy/aks-app-deployment) — Application Helm charts
