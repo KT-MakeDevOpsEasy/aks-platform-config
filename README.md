@@ -75,5 +75,5 @@ The bootstrap script:
 
 - [helm-gatekeeper](https://github.com/KT-MakeDevOpsEasy/helm-gatekeeper) — Gatekeeper Helm configuration
 - [helm-ingress-nginx](https://github.com/KT-MakeDevOpsEasy/helm-ingress-nginx) — NGINX Ingress Helm configuration
-- [terraform-aks-deployment](https://github.com/KT-MakeDevOpsEasy/terraform-aks-deployment) — AKS infrastructure
+- [terraform-aks-deployment](https://github.com/KT-MakeDevOpsEasy/terraform-azure-aks-deployment) — AKS infrastructure
 - [aks-app-deployment](https://github.com/KT-MakeDevOpsEasy/aks-app-deployment) — Application Helm charts
