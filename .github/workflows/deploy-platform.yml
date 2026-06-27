@@ -1,0 +1,85 @@
+name: "Deploy Platform Config"
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+    paths:
+      - "policies/**"
+      - "scripts/**"
+
+env:
+  HELM_VERSION: "3.14.0"
+
+jobs:
+  validate:
+    name: "Validate Manifests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: YAML Lint
+        run: |
+          pip install yamllint
+          yamllint -d relaxed policies/
+
+  deploy-dev:
+    name: "Deploy to dev"
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_CLUSTER_NAME }}
+
+      - name: Bootstrap Platform
+        run: |
+          chmod +x scripts/bootstrap.sh
+          scripts/bootstrap.sh dev
+
+  deploy-prod:
+    name: "Deploy to prod"
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_CLUSTER_NAME }}
+
+      - name: Bootstrap Platform
+        run: |
+          chmod +x scripts/bootstrap.sh
+          scripts/bootstrap.sh prod
