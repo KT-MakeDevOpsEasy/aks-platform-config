@@ -15,7 +15,7 @@ helm-ingress-nginx (NGINX Ingress Helm values, pinned v4.10.0)
     └── policies/             ← OPA constraint templates + constraints
              │
              ▼
-    terraform-aks-deployment
+    terraform-azure-aks-deployment
     (calls bootstrap.sh after terraform apply)
 ```
 
