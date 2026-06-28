@@ -10,9 +10,7 @@ WORK_DIR="${REPO_ROOT}/.bootstrap-tmp"
 GATEKEEPER_REPO="https://github.com/KT-MakeDevOpsEasy/helm-gatekeeper.git"
 GATEKEEPER_REF="v1.0.0"
 
-INGRESS_REPO="https://github.com/KT-MakeDevOpsEasy/helm-ingress-nginx.git"
-INGRESS_REF="v1.0.0"
-
+GATEWAY_API_VERSION="v1.2.0"
 ESO_VERSION="0.10.7"
 
 echo "=== AKS Platform Bootstrap (${ENVIRONMENT}) ==="
@@ -26,10 +24,10 @@ trap cleanup EXIT
 mkdir -p "$WORK_DIR"
 
 # --- 1. Install Gatekeeper ---
-echo "[1/6] Cloning helm-gatekeeper (${GATEKEEPER_REF})..."
+echo "[1/5] Cloning helm-gatekeeper (${GATEKEEPER_REF})..."
 git clone --depth 1 --branch "$GATEKEEPER_REF" "$GATEKEEPER_REPO" "$WORK_DIR/helm-gatekeeper"
 
-echo "[2/6] Installing Gatekeeper..."
+echo "[2/5] Installing Gatekeeper..."
 cd "$WORK_DIR/helm-gatekeeper"
 helm dependency update .
 helm upgrade --install gatekeeper . \
@@ -46,14 +44,15 @@ kubectl wait --for=condition=ready pod \
   --timeout=120s
 
 # --- 2. Apply OPA Policies ---
-echo "[3/6] Applying constraint templates..."
+echo "[3/5] Applying constraint templates..."
 kubectl apply -f "$REPO_ROOT/policies/constraint-templates/"
 
 echo "Waiting for CRDs to register..."
 sleep 15
 
-echo "[4/6] Applying constraints..."
+echo "[4/5] Applying constraints..."
 if [[ -n "$ACR_LOGIN_SERVER" ]]; then
+  export ACR_LOGIN_SERVER
   envsubst < "$REPO_ROOT/policies/constraints/allowed-registries.yaml" | kubectl apply -f -
   kubectl apply -f "$REPO_ROOT/policies/constraints/require-app-labels.yaml"
 else
@@ -62,7 +61,7 @@ else
 fi
 
 # --- 3. Install External Secrets Operator ---
-echo "[5/6] Installing External Secrets Operator (${ESO_VERSION})..."
+echo "[5/5] Installing External Secrets Operator (${ESO_VERSION})..."
 helm repo add external-secrets https://charts.external-secrets.io
 helm repo update
 helm upgrade --install external-secrets external-secrets/external-secrets \
@@ -73,18 +72,9 @@ helm upgrade --install external-secrets external-secrets/external-secrets \
   --wait \
   --timeout 5m
 
-# --- 4. Install NGINX Ingress ---
-echo "[6/6] Cloning helm-ingress-nginx (${INGRESS_REF})..."
-git clone --depth 1 --branch "$INGRESS_REF" "$INGRESS_REPO" "$WORK_DIR/helm-ingress-nginx"
-
-cd "$WORK_DIR/helm-ingress-nginx"
-helm dependency update .
-helm upgrade --install ingress-nginx . \
-  --namespace ingress-nginx \
-  --create-namespace \
-  -f "values-${ENVIRONMENT}.yaml" \
-  --wait \
-  --timeout 5m
+# --- 4. Install Gateway API CRDs (Cilium handles the data plane) ---
+echo "Installing Gateway API CRDs (${GATEWAY_API_VERSION})..."
+kubectl apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml"
 
 # --- Verify ---
 echo ""
@@ -101,5 +91,5 @@ echo ""
 echo "External Secrets Operator pods:"
 kubectl get pods -n external-secrets
 echo ""
-echo "Ingress Controller pods:"
-kubectl get pods -n ingress-nginx
+echo "Gateway API CRDs:"
+kubectl get crd | grep gateway || echo "  (none found)"
