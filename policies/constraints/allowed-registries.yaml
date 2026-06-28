@@ -14,8 +14,6 @@ spec:
       - gatekeeper-system
   parameters:
     registries:
-      # Replace with your ACR login server
-      - "acrdemodeveuseus.azurecr.io/"
-      # Common trusted registries
+      - "${ACR_LOGIN_SERVER}/"
       - "docker.io/library/"
       - "mcr.microsoft.com/"
