@@ -23,9 +23,9 @@ helm-ingress-nginx (NGINX Ingress Helm values, pinned v4.10.0)
 
 | Component | Description |
 |---|---|
-| **Bootstrap script** | `scripts/bootstrap.sh` — installs Gatekeeper, applies OPA policies, installs NGINX Ingress |
+| **Bootstrap script** | `scripts/bootstrap.sh` — installs Gatekeeper, ESO, Gateway API CRDs, applies OPA policies |
 | **OPA constraint templates** | Rego-based policy templates (required labels, allowed registries) |
-| **Gatekeeper constraints** | Constraint instances applied to workloads |
+| **Gatekeeper constraints** | Per-environment constraints (dryrun for dev, deny for prod) |
 | **Docs** | Architecture decisions, operations runbook, security checklist |
 
 ## Structure
@@ -39,8 +39,12 @@ aks-platform-config/
 │   │   ├── require-labels.yaml
 │   │   └── restrict-registries.yaml
 │   └── constraints/
-│       ├── require-app-labels.yaml
-│       └── allowed-registries.yaml
+│       ├── dev/                     # enforcementAction: dryrun
+│       │   ├── require-app-labels.yaml
+│       │   └── allowed-registries.yaml
+│       └── prod/                    # enforcementAction: deny
+│           ├── require-app-labels.yaml
+│           └── allowed-registries.yaml
 ├── docs/
 │   ├── architecture.md
 │   └── operations.md
@@ -61,8 +65,10 @@ aks-platform-config/
 The bootstrap script:
 1. Clones `helm-gatekeeper` (pinned version) → installs via Helm
 2. Waits for Gatekeeper webhook readiness
-3. Applies constraint templates, then constraints
-4. Clones `helm-ingress-nginx` (pinned version) → installs via Helm
+3. Installs External Secrets Operator via Helm
+4. Installs Gateway API CRDs (Cilium handles the data plane)
+5. Applies constraint templates
+6. Applies per-environment constraints (dryrun for dev, deny for prod)
 
 ## Branching Strategy
 
@@ -74,6 +80,5 @@ The bootstrap script:
 ## Related Repos
 
 - [helm-gatekeeper](https://github.com/KT-MakeDevOpsEasy/helm-gatekeeper) — Gatekeeper Helm configuration
-- [helm-ingress-nginx](https://github.com/KT-MakeDevOpsEasy/helm-ingress-nginx) — NGINX Ingress Helm configuration
 - [azure-challenges](https://github.com/KT-MakeDevOpsEasy/azure-challenges) — Challenge deployments (VNET + AKS)
 - [aks-app-deployment](https://github.com/KT-MakeDevOpsEasy/aks-app-deployment) — Application Helm charts

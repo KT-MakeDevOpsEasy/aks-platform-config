@@ -1,19 +1,17 @@
 apiVersion: constraints.gatekeeper.sh/v1beta1
-kind: K8sAllowedRegistries
+kind: K8sRequiredLabels
 metadata:
-  name: allowed-registries
+  name: require-app-labels
 spec:
+  enforcementAction: dryrun
   match:
     kinds:
-      - apiGroups: [""]
-        kinds: ["Pod"]
       - apiGroups: ["apps"]
         kinds: ["Deployment", "StatefulSet"]
     excludedNamespaces:
       - kube-system
       - gatekeeper-system
   parameters:
-    registries:
-      - "${ACR_LOGIN_SERVER}/"
-      - "docker.io/library/"
-      - "mcr.microsoft.com/"
+    labels:
+      - "app.kubernetes.io/name"
+      - "app.kubernetes.io/instance"

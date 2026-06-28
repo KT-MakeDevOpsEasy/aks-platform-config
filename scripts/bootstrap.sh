@@ -24,12 +24,18 @@ trap cleanup EXIT
 mkdir -p "$WORK_DIR"
 
 # --- 1. Install Gatekeeper ---
-echo "[1/5] Cloning helm-gatekeeper (${GATEKEEPER_REF})..."
+echo "[1/6] Cloning helm-gatekeeper (${GATEKEEPER_REF})..."
 git clone --depth 1 --branch "$GATEKEEPER_REF" "$GATEKEEPER_REPO" "$WORK_DIR/helm-gatekeeper"
 
-echo "[2/5] Installing Gatekeeper..."
+echo "[2/6] Installing Gatekeeper..."
 cd "$WORK_DIR/helm-gatekeeper"
 helm dependency update .
+
+# AKS admissionsenforcer reclaims webhook field ownership continuously,
+# causing server-side apply conflicts. Delete before upgrade; Helm recreates them.
+kubectl delete validatingwebhookconfiguration gatekeeper-validating-webhook-configuration --ignore-not-found
+kubectl delete mutatingwebhookconfiguration gatekeeper-mutating-webhook-configuration --ignore-not-found
+
 helm upgrade --install gatekeeper . \
   --namespace gatekeeper-system \
   --create-namespace \
@@ -43,25 +49,8 @@ kubectl wait --for=condition=ready pod \
   -n gatekeeper-system \
   --timeout=120s
 
-# --- 2. Apply OPA Policies ---
-echo "[3/5] Applying constraint templates..."
-kubectl apply -f "$REPO_ROOT/policies/constraint-templates/"
-
-echo "Waiting for CRDs to register..."
-sleep 15
-
-echo "[4/5] Applying constraints..."
-if [[ -n "$ACR_LOGIN_SERVER" ]]; then
-  export ACR_LOGIN_SERVER
-  envsubst < "$REPO_ROOT/policies/constraints/allowed-registries.yaml" | kubectl apply -f -
-  kubectl apply -f "$REPO_ROOT/policies/constraints/require-app-labels.yaml"
-else
-  echo "WARNING: ACR_LOGIN_SERVER not set, skipping allowed-registries constraint"
-  kubectl apply -f "$REPO_ROOT/policies/constraints/require-app-labels.yaml"
-fi
-
-# --- 3. Install External Secrets Operator ---
-echo "[5/5] Installing External Secrets Operator (${ESO_VERSION})..."
+# --- 2. Install External Secrets Operator ---
+echo "[3/6] Installing External Secrets Operator (${ESO_VERSION})..."
 helm repo add external-secrets https://charts.external-secrets.io
 helm repo update
 helm upgrade --install external-secrets external-secrets/external-secrets \
@@ -72,9 +61,26 @@ helm upgrade --install external-secrets external-secrets/external-secrets \
   --wait \
   --timeout 5m
 
-# --- 4. Install Gateway API CRDs (Cilium handles the data plane) ---
-echo "Installing Gateway API CRDs (${GATEWAY_API_VERSION})..."
+# --- 3. Install Gateway API CRDs ---
+echo "[4/6] Installing Gateway API CRDs (${GATEWAY_API_VERSION})..."
 kubectl apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml"
+
+# --- 4. Apply OPA Policies ---
+echo "[5/6] Applying constraint templates..."
+kubectl apply -f "$REPO_ROOT/policies/constraint-templates/"
+
+echo "Waiting for CRDs to register..."
+sleep 15
+
+echo "[6/6] Applying constraints (${ENVIRONMENT})..."
+if [[ -n "$ACR_LOGIN_SERVER" ]]; then
+  export ACR_LOGIN_SERVER
+  envsubst < "$REPO_ROOT/policies/constraints/${ENVIRONMENT}/allowed-registries.yaml" | kubectl apply -f -
+  kubectl apply -f "$REPO_ROOT/policies/constraints/${ENVIRONMENT}/require-app-labels.yaml"
+else
+  echo "WARNING: ACR_LOGIN_SERVER not set, skipping allowed-registries constraint"
+  kubectl apply -f "$REPO_ROOT/policies/constraints/${ENVIRONMENT}/require-app-labels.yaml"
+fi
 
 # --- Verify ---
 echo ""
@@ -86,7 +92,7 @@ echo "Constraint Templates:"
 kubectl get constrainttemplates
 echo ""
 echo "Constraints:"
-kubectl get constraints
+kubectl get constraints -o custom-columns=NAME:.metadata.name,ACTION:.spec.enforcementAction
 echo ""
 echo "External Secrets Operator pods:"
 kubectl get pods -n external-secrets
